@@ -1,0 +1,88 @@
+# ============================================================
+# Credentials / access tokens — never commit
+# ============================================================
+# The live token file written by auth/token_manager.py
+access.txt
+
+# Atomic-write leftover: token_manager writes via "access.txt.tmp"
+# and os.replace()es it; a crash could leave a real token inside.
+access.txt.tmp
+*.tmp
+
+# Generic token/secret file names. auth_main.py honours the
+# ACCESS_TOKEN_FILE env var, so the token may live under another name.
+*.token
+*.token.txt
+*.secret
+*.key
+*.pem
+*.p12
+*.pfx
+*.p12
+
+# Environment files that may carry secrets
+.env
+.env.*
+!.env.example
+
+# Common credential-store filenames
+secrets.json
+secrets.yaml
+secrets.yml
+credentials.json
+service-account*.json
+*.pem.orig
+id_rsa
+id_ed25519
+id_ecdsa
+*.ppk
+
+# Directory-style credential dumps
+.secrets/
+.secrets
+credentials/
+
+# ============================================================
+# Runtime data created by the app (tasks.json, downloads).
+# ============================================================
+data/*
+# ...but keep the downloads directory skeleton tracked, not its contents.
+!data/downloads/
+data/downloads/*
+!data/downloads/README.md
+
+# ============================================================
+# Bytecode / tool caches
+# ============================================================
+__pycache__/
+*.py[cod]
+
+# Pytest cache (also found under new_project/)
+.pytest_cache/
+new_project/.pytest_cache/
+
+# Coverage / type-checker output
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ============================================================
+# Virtual environments
+# ============================================================
+.venv/
+venv/
+env/
+ENV/
+
+# ============================================================
+# OS / editor noise
+# ============================================================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/

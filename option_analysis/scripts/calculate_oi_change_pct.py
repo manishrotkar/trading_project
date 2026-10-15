@@ -1,165 +1,254 @@
+from pathlib import Path
 import sqlite3
 
-OI_DB = "option_analysis/database/oi_analysis.db"
 
-conn = sqlite3.connect(OI_DB)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DB_PATH = PROJECT_ROOT / "database" / "oi_analysis.db"
 
-# Get all option OI data
-rows = conn.execute("""
-    SELECT
-        index_name,
-        expiry,
-        datetime,
-        strike,
-        ce_oi,
-        pe_oi,
-        ce_oi_change,
-        pe_oi_change
-    FROM strike_oi_analysis
-    ORDER BY index_name, expiry, datetime, strike
-""").fetchall()
+RANGES = [1, 2, 5, 10]
 
-# Group by index + expiry + datetime
-groups = {}
+# Strike intervals
+STRIKE_STEP = {
+    "NIFTY": 50,
+    "BANKNIFTY": 100,
+}
 
-for row in rows:
-    index_name, expiry, datetime, strike, ce_oi, pe_oi, ce_chg, pe_chg = row
 
-    key = (index_name, expiry, datetime)
-
-    if key not in groups:
-        groups[key] = []
-
-    groups[key].append(row)
-
-updated = 0
-
-for (index_name, expiry, datetime), current_rows in groups.items():
-
-    # Find previous candle
-    previous_time = conn.execute("""
-        SELECT MAX(datetime)
+def get_previous_oi(cur, index_name, expiry, datetime, strike):
+    row = cur.execute(
+        """
+        SELECT ce_oi, pe_oi
         FROM strike_oi_analysis
         WHERE index_name = ?
           AND expiry = ?
+          AND strike = ?
           AND datetime < ?
-    """, (index_name, expiry, datetime)).fetchone()[0]
+          AND date(datetime) = date(?)
+        ORDER BY datetime DESC
+        LIMIT 1
+        """,
+        (
+            index_name,
+            expiry,
+            strike,
+            datetime,
+            datetime,
+        ),
+    ).fetchone()
 
-    # First candle has no previous candle
-    if previous_time is None:
-        continue
+    return row
 
-    previous_rows = conn.execute("""
+
+def calculate_range_change(
+    cur,
+    index_name,
+    expiry,
+    datetime,
+    atm_strike,
+    range_n,
+):
+    step = STRIKE_STEP[index_name]
+    distance = range_n * step
+
+    current_rows = cur.execute(
+        """
         SELECT strike, ce_oi, pe_oi
         FROM strike_oi_analysis
         WHERE index_name = ?
           AND expiry = ?
           AND datetime = ?
-    """, (index_name, expiry, previous_time)).fetchall()
+          AND strike BETWEEN ? AND ?
+        ORDER BY strike
+        """,
+        (
+            index_name,
+            expiry,
+            datetime,
+            atm_strike - distance,
+            atm_strike + distance,
+        ),
+    ).fetchall()
 
-    previous = {
-        strike: (ce_oi, pe_oi)
-        for strike, ce_oi, pe_oi in previous_rows
-    }
+    # Expected number of strikes:
+    # ATM +/- N contains 2N + 1 strikes.
+    expected_count = (2 * range_n) + 1
 
-    # Get ATM already calculated in our concentration table
-    atm_row = conn.execute("""
-        SELECT atm_strike
-        FROM atm_oi_concentration
-        WHERE index_name = ?
-          AND expiry = ?
-          AND datetime = ?
-    """, (index_name, expiry, datetime)).fetchone()
+    if len(current_rows) != expected_count:
+        return None
 
-    if atm_row is None:
-        continue
+    current_ce = 0.0
+    current_pe = 0.0
+    previous_ce = 0.0
+    previous_pe = 0.0
 
-    atm_strike = atm_row[0]
+    for strike, ce_oi, pe_oi in current_rows:
 
-    current = [
-        r for r in current_rows
-        if r[6] is not None
-        and r[7] is not None
-        and r[3] in previous
-    ]
+        previous = get_previous_oi(
+            cur,
+            index_name,
+            expiry,
+            datetime,
+            strike,
+        )
 
-    if not current:
-        continue
+        if previous is None:
+            return None
 
-    # Find strike nearest to ATM
-    atm_index = min(
-        range(len(current)),
-        key=lambda i: abs(current[i][3] - atm_strike)
+        prev_ce, prev_pe = previous
+
+        current_ce += ce_oi
+        current_pe += pe_oi
+        previous_ce += prev_ce
+        previous_pe += prev_pe
+
+    ce_change = current_ce - previous_ce
+    pe_change = current_pe - previous_pe
+
+    ce_pct = (
+        (ce_change / previous_ce) * 100
+        if previous_ce != 0
+        else None
     )
 
-    def range_pct(n):
-        selected = current[
-            max(0, atm_index - n):
-            min(len(current), atm_index + n + 1)
-        ]
+    pe_pct = (
+        (pe_change / previous_pe) * 100
+        if previous_pe != 0
+        else None
+    )
 
-        ce_change = sum(r[6] for r in selected)
-        pe_change = sum(r[7] for r in selected)
+    return (
+        current_ce,
+        current_pe,
+        ce_change,
+        pe_change,
+        ce_pct,
+        pe_pct,
+    )
 
-        ce_previous = sum(previous[r[3]][0] for r in selected)
-        pe_previous = sum(previous[r[3]][1] for r in selected)
 
-        ce_pct = (
-            ce_change * 100.0 / ce_previous
-            if ce_previous != 0 else None
+def main():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    rows = cur.execute(
+        """
+        SELECT
+            index_name,
+            expiry,
+            datetime,
+            atm_strike
+        FROM atm_oi_analysis
+        ORDER BY index_name, datetime
+        """
+    ).fetchall()
+
+    print(f"Processing {len(rows)} timestamps...")
+
+    complete_counts = {
+        n: 0
+        for n in RANGES
+    }
+
+    processed = 0
+
+    for index_name, expiry, datetime, atm_strike in rows:
+
+        values = {}
+
+        for n in RANGES:
+
+            result = calculate_range_change(
+                cur,
+                index_name,
+                expiry,
+                datetime,
+                atm_strike,
+                n,
+            )
+
+            if result is None:
+                values[n] = (None,) * 6
+                continue
+
+            values[n] = result
+            complete_counts[n] += 1
+
+        # Update only the active ranges.
+        cur.execute(
+            """
+            UPDATE atm_oi_concentration
+            SET
+                ce_oi_change_pm1 = ?,
+                pe_oi_change_pm1 = ?,
+                ce_oi_change_pct_pm1 = ?,
+                pe_oi_change_pct_pm1 = ?,
+
+                ce_oi_change_pm2 = ?,
+                pe_oi_change_pm2 = ?,
+                ce_oi_change_pct_pm2 = ?,
+                pe_oi_change_pct_pm2 = ?,
+
+                ce_oi_change_pm5 = ?,
+                pe_oi_change_pm5 = ?,
+                ce_oi_change_pct_pm5 = ?,
+                pe_oi_change_pct_pm5 = ?,
+
+                ce_oi_change_pm10 = ?,
+                pe_oi_change_pm10 = ?,
+                ce_oi_change_pct_pm10 = ?,
+                pe_oi_change_pct_pm10 = ?
+
+            WHERE index_name = ?
+              AND datetime = ?
+            """,
+            (
+                values[1][2],
+                values[1][3],
+                values[1][4],
+                values[1][5],
+
+                values[2][2],
+                values[2][3],
+                values[2][4],
+                values[2][5],
+
+                values[5][2],
+                values[5][3],
+                values[5][4],
+                values[5][5],
+
+                values[10][2],
+                values[10][3],
+                values[10][4],
+                values[10][5],
+
+                index_name,
+                datetime,
+            ),
         )
 
-        pe_pct = (
-            pe_change * 100.0 / pe_previous
-            if pe_previous != 0 else None
+        processed += 1
+
+        if processed % 1000 == 0:
+            conn.commit()
+            print(f"Processed: {processed}")
+
+    conn.commit()
+
+    print("\nCompleted.")
+    print(f"Rows processed: {processed}")
+
+    for n in RANGES:
+        print(
+            f"Complete +/-{n}: "
+            f"{complete_counts[n]}"
         )
 
-        return ce_pct, pe_pct
+    print("\nNote:")
+    print("±20 OI-change is intentionally not calculated.")
 
-    ce_atm, pe_atm = range_pct(0)
-    ce_pm1, pe_pm1 = range_pct(1)
-    ce_pm2, pe_pm2 = range_pct(2)
-    ce_pm5, pe_pm5 = range_pct(5)
-    ce_pm10, pe_pm10 = range_pct(10)
-    ce_pm20, pe_pm20 = range_pct(20)
+    conn.close()
 
-    conn.execute("""
-        UPDATE atm_oi_concentration
-        SET
-            ce_oi_change_pct_atm = ?,
-            pe_oi_change_pct_atm = ?,
 
-            ce_oi_change_pct_pm1 = ?,
-            pe_oi_change_pct_pm1 = ?,
-
-            ce_oi_change_pct_pm2 = ?,
-            pe_oi_change_pct_pm2 = ?,
-
-            ce_oi_change_pct_pm5 = ?,
-            pe_oi_change_pct_pm5 = ?,
-
-            ce_oi_change_pct_pm10 = ?,
-            pe_oi_change_pct_pm10 = ?,
-
-            ce_oi_change_pct_pm20 = ?,
-            pe_oi_change_pct_pm20 = ?
-
-        WHERE index_name = ?
-          AND expiry = ?
-          AND datetime = ?
-    """, (
-        ce_atm, pe_atm,
-        ce_pm1, pe_pm1,
-        ce_pm2, pe_pm2,
-        ce_pm5, pe_pm5,
-        ce_pm10, pe_pm10,
-        ce_pm20, pe_pm20,
-        index_name, expiry, datetime
-    ))
-
-    updated += 1
-
-conn.commit()
-conn.close()
-
-print(f"OI percentage rows updated: {updated}")
+if __name__ == "__main__":
+    main()

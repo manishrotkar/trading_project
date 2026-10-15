@@ -1,0 +1,27 @@
+#
+# requirements.in — direct dependencies for the Tiny To-Do project.
+#
+# The application code itself (main.py, todo/) runs on the standard
+# library alone. This file lists what is needed to *develop and test*
+# it, plus the version markers the code relies on.
+#
+# This is the hand-edited source file. Compile it into the pinned
+# lock file with:
+#
+#     pip install pip-tools
+#     pip-compile requirements.in
+#
+# and install from the lock file with:
+#
+#     pip install -r requirements.txt
+#
+
+# Test runner (used by tests/ and scripts/run_checks.py).
+# pytest 9.x requires Python >= 3.10.
+pytest >= 8.0
+
+# The default task store is a JSON file (todo/storage.py uses the stdlib
+# json + pathlib modules). Any TOML handling relies on the standard
+# library's tomllib, which exists on Python >= 3.11 only — older
+# interpreters need the backport below.
+tomli >= 1.1.0 ; python_version < "3.11"

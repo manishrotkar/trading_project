@@ -39,11 +39,11 @@ DB_PATH = (
 
 # NIFTY + BANKNIFTY option period
 UNDERLYING_START_DATE = "2026-09-01"
-UNDERLYING_END_DATE = "2026-09-25"
+UNDERLYING_END_DATE = datetime.now().strftime("%Y-%m-%d")
 
 # India VIX historical period
 VIX_START_DATE = "2021-01-01"
-VIX_END_DATE = "2026-09-25"
+VIX_END_DATE = datetime.now().strftime("%Y-%m-%d")
 
 # FYERS historical API batch size
 BATCH_DAYS = 30

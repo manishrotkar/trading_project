@@ -1,0 +1,68 @@
+from core.option_leg import OptionLeg
+from core.strategy import Strategy
+
+
+def create_bull_call_spread(
+    index_name: str,
+    expiry: str,
+    lower_strike: float,
+    higher_strike: float,
+    quantity: int,
+    lower_call_premium: float,
+    higher_call_premium: float,
+) -> Strategy:
+    """
+    Create a Bull Call Spread.
+
+    Structure:
+        BUY  lower-strike CE
+        SELL higher-strike CE
+    """
+
+    if lower_strike >= higher_strike:
+        raise ValueError(
+            "lower_strike must be less than higher_strike"
+        )
+
+    if quantity <= 0:
+        raise ValueError(
+            "quantity must be greater than 0"
+        )
+
+    if lower_call_premium < 0 or higher_call_premium < 0:
+        raise ValueError(
+            "option premiums cannot be negative"
+        )
+
+    strategy = Strategy(
+        name="Bull Call Spread",
+        underlying=index_name,
+    )
+
+    strategy.add_leg(
+        OptionLeg(
+            index_name=index_name,
+            expiry=expiry,
+            strike=lower_strike,
+            option_type="CE",
+            position="BUY",
+            quantity=quantity,
+            entry_premium=lower_call_premium,
+        )
+    )
+
+    strategy.add_leg(
+        OptionLeg(
+            index_name=index_name,
+            expiry=expiry,
+            strike=higher_strike,
+            option_type="CE",
+            position="SELL",
+            quantity=quantity,
+            entry_premium=higher_call_premium,
+        )
+    )
+
+    strategy.validate()
+
+    return strategy

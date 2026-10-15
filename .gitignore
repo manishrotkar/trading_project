@@ -43,3 +43,69 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Additional local logs
+*.log.*
+
+# Local backup and temporary copies
+*.bak
+*.backup
+*.before-*
+*.step*-working
+**/backups/
+
+# Python and test artifacts
+.Rhistory
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local AI assistant runtime data
+isoquant_test/web_ui/data/conversations/*
+!isoquant_test/web_ui/data/conversations/.gitkeep
+isoquant_test/web_ui/data/uploads/*
+isoquant_test/web_ui/data/downloads/*
+
+# Generated analysis output
+nse_stockoption_csv/output/
+
+# Experimental and temporary scripts
+**/scratch_*.py
+**/tmp_*.py
+**/_tmp_*.py
+**/_step*.py
+**/_env_probe.py
+**/_show_locations.py
+**/_smoke_check.py
+**/_syntax_check.py
+
+# Local runtime conversation and upload files
+isoquant_test/web_ui/data/conversations/*
+!isoquant_test/web_ui/data/conversations/.gitkeep
+isoquant_test/web_ui/data/uploads/*
+
+# Additional temporary and backup files
+**/*.before_*
+**/*.before-*
+**/*.step*-backup
+**/scratch_*.py
+**/tmp_*.py
+**/_tmp_*.py
+**/_step*.py
+**/_env_probe.py
+**/_show_locations.py
+**/_smoke_check.py
+**/_syntax_check.py
+
+# Local runtime files
+isoquant_test/web_ui/data/conversations/*
+!isoquant_test/web_ui/data/conversations/.gitkeep
+isoquant_test/web_ui/data/uploads/*
+
+# Local web UI data: conversations, uploads, and downloads
+isoquant_test/web_ui/data/conversations/*
+!isoquant_test/web_ui/data/conversations/.gitkeep
+isoquant_test/web_ui/data/uploads/*
+isoquant_test/web_ui/data/downloads/*

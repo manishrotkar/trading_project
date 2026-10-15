@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "textstats"
+version = "1.0.0"
+description = "A tiny text analysis library and CLI"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.scripts]
+textstats = "textstats.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["textstats*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

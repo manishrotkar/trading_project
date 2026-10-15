@@ -1,0 +1,5 @@
+# Sample file for demo purposes.
+
+Hello world
+Hello again
+Text analysis is easy with textstats.

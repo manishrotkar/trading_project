@@ -48,7 +48,7 @@ MASTER_FILE = (
 # ============================================================
 
 START_DATE = "2026-09-01"
-END_DATE = "2026-09-25"
+END_DATE = datetime.now().strftime("%Y-%m-%d")
 
 NUMBER_OF_STRIKES = 10
 
@@ -653,7 +653,15 @@ def download_contract(
             f"Starting from: {start}"
         )
         
-    end = pd.Timestamp(END_DATE) + pd.Timedelta(days=1)
+    # Expired contract: do not query FYERS after expiry date
+    if pd.Timestamp(END_DATE) > pd.Timestamp(expiry):
+        print("Contract expired. Skipping.")
+        return 0
+
+    end = min(
+        pd.Timestamp(END_DATE) + pd.Timedelta(days=1),
+        pd.Timestamp(expiry) + pd.Timedelta(days=1),
+    )
 
     if start >= end:
 
@@ -687,7 +695,8 @@ def download_contract(
         
         request_end = min(
             batch_end,
-            pd.Timestamp(END_DATE)
+            pd.Timestamp(END_DATE),
+            pd.Timestamp(expiry)
         )
 
         range_to = (

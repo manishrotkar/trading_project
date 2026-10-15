@@ -1,0 +1,109 @@
+
+import pytest
+
+from core.option_leg import OptionLeg
+from strategies.long_strangle import create_long_strangle
+
+
+def test_long_strangle_structure():
+    strategy = create_long_strangle(
+        index_name="NIFTY",
+        expiry="2026-10-01",
+        put_strike=23000,
+        call_strike=23400,
+        quantity=75,
+        put_premium=100,
+        call_premium=120,
+    )
+
+    assert strategy.name == "Long Strangle"
+    assert strategy.underlying == "NIFTY"
+    assert strategy.leg_count == 2
+
+    put_leg = strategy.legs[0]
+    call_leg = strategy.legs[1]
+
+    assert isinstance(put_leg, OptionLeg)
+    assert isinstance(call_leg, OptionLeg)
+
+    assert put_leg.strike == 23000
+    assert put_leg.option_type == "PE"
+    assert put_leg.position == "BUY"
+
+    assert call_leg.strike == 23400
+    assert call_leg.option_type == "CE"
+    assert call_leg.position == "BUY"
+
+    assert put_leg.quantity == 75
+    assert call_leg.quantity == 75
+
+
+def test_long_strangle_net_debit():
+    strategy = create_long_strangle(
+        index_name="NIFTY",
+        expiry="2026-10-01",
+        put_strike=23000,
+        call_strike=23400,
+        quantity=75,
+        put_premium=100,
+        call_premium=120,
+    )
+
+    # Total premium = 100 + 120 = 220
+    # Net debit = 220 * 75 = 16,500
+
+    assert strategy.net_premium == -16500
+    assert strategy.net_premium_paid == 16500
+    assert strategy.net_premium_received == 0
+
+
+def test_invalid_strike_order():
+    with pytest.raises(ValueError):
+        create_long_strangle(
+            index_name="NIFTY",
+            expiry="2026-10-01",
+            put_strike=23400,
+            call_strike=23000,
+            quantity=75,
+            put_premium=100,
+            call_premium=120,
+        )
+
+
+def test_equal_strikes_rejected():
+    with pytest.raises(ValueError):
+        create_long_strangle(
+            index_name="NIFTY",
+            expiry="2026-10-01",
+            put_strike=23200,
+            call_strike=23200,
+            quantity=75,
+            put_premium=100,
+            call_premium=120,
+        )
+
+
+def test_negative_premium_rejected():
+    with pytest.raises(ValueError):
+        create_long_strangle(
+            index_name="NIFTY",
+            expiry="2026-10-01",
+            put_strike=23000,
+            call_strike=23400,
+            quantity=75,
+            put_premium=-10,
+            call_premium=120,
+        )
+
+
+def test_invalid_quantity_rejected():
+    with pytest.raises(ValueError):
+        create_long_strangle(
+            index_name="NIFTY",
+            expiry="2026-10-01",
+            put_strike=23000,
+            call_strike=23400,
+            quantity=0,
+            put_premium=100,
+            call_premium=120,
+        )
