@@ -109,3 +109,6 @@ isoquant_test/web_ui/data/conversations/*
 !isoquant_test/web_ui/data/conversations/.gitkeep
 isoquant_test/web_ui/data/uploads/*
 isoquant_test/web_ui/data/downloads/*
+# Local web UI conversations and uploaded data
+/isoquant_test/web_ui/data/*
+!/isoquant_test/web_ui/data/.gitkeep
